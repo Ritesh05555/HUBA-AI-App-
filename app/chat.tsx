@@ -1,7 +1,7 @@
 
-//////////////////////////////////////////////////////////////////////
 
-// perfect
+//////////////////////////////////////////////////////////////
+
 // import React, { useState, useEffect, useRef } from "react";
 // import {
 //   View,
@@ -28,11 +28,11 @@
 //   const [showWelcome, setShowWelcome] = useState(true);
 //   const [theme, setTheme] = useState<"light" | "dark">("light");
 //   const scrollViewRef = useRef<RNScrollView | null>(null);
+//   const inputRef = useRef<TextInput | null>(null); // Add ref for TextInput
 
 //   useEffect(() => {
 //     const welcomeTimer = setTimeout(() => {
 //       setShowWelcome(false);
-//       setDisplayedMessages([]);
 //     }, 3000);
 
 //     return () => {
@@ -46,8 +46,47 @@
 //     }
 //   }, [displayedMessages, isThinking]);
 
+//   // Function to check if the query is about time or date
+//   const isTimeOrDateQuery = (query: string) => {
+//     const lowerQuery = query.toLowerCase();
+//     return (
+//       lowerQuery.includes("time") ||
+//       lowerQuery.includes("date") ||
+//       lowerQuery.includes("day")
+//     );
+//   };
+
+//   // Function to generate time, date, and day on the frontend
+//   const generateTimeDateResponse = (query: string) => {
+//     const now = new Date();
+//     const time = now.toLocaleTimeString("en-US", {
+//       hour: "2-digit",
+//       minute: "2-digit",
+//       second: "2-digit",
+//       hour12: true,
+//     });
+//     const date = now.toLocaleDateString("en-US", {
+//       year: "numeric",
+//       month: "long",
+//       day: "numeric",
+//     });
+//     const day = now.toLocaleDateString("en-US", { weekday: "long" });
+
+//     const lowerQuery = query.toLowerCase();
+//     if (lowerQuery.includes("time")) {
+//       return `The current time is ${time}, on ${day}, ${date}.`;
+//     } else {
+//       // For date or day queries
+//       return `Today is ${date}, a ${day}. The current time is ${time}.`;
+//     }
+//   };
+
 //   const handleSubmit = async () => {
 //     if (!query.trim()) return;
+
+//     // Hide the welcome message immediately when the user submits a question
+//     setShowWelcome(false);
+
 //     const timestamp = new Date().toISOString();
 //     const newMessage = {
 //       question: query,
@@ -58,6 +97,26 @@
 //     };
 //     setDisplayedMessages((prev) => [...prev, newMessage]);
 //     setIsThinking(true);
+
+//     // Check if the query is about time or date
+//     if (isTimeOrDateQuery(query)) {
+//       const response = generateTimeDateResponse(query);
+//       setDisplayedMessages((prev) => {
+//         const updated = [...prev];
+//         updated[updated.length - 1] = {
+//           ...updated[updated.length - 1],
+//           answer: response,
+//           error: false,
+//           canRetry: false,
+//         };
+//         return updated;
+//       });
+//       setIsThinking(false);
+//       setQuery("");
+//       return;
+//     }
+
+//     // For non-time/date queries, proceed with backend request
 //     try {
 //       const token = await AsyncStorage.getItem("token");
 //       const response = await axios.post(
@@ -121,10 +180,8 @@
 
 //   // Function to parse text and render bold text for <strong> tags
 //   const renderTextWithBold = (text: string, theme: "light" | "dark") => {
-//     // Split the text by <strong> tags
 //     const parts = text.split(/<strong>(.*?)<\/strong>/g);
 //     return parts.map((part, index) => {
-//       // If the index is odd, this part was inside <strong> tags, so render it as bold
 //       if (index % 2 === 1) {
 //         return (
 //           <Text
@@ -139,7 +196,6 @@
 //           </Text>
 //         );
 //       }
-//       // Otherwise, render it as regular text
 //       return (
 //         <Text
 //           key={index}
@@ -149,6 +205,45 @@
 //         </Text>
 //       );
 //     });
+//   };
+
+//   // Function to check if the response is a temperature response and extract data
+//   const parseTemperatureResponse = (answer: string) => {
+//     // Try a more flexible regex to match various temperature response formats
+//     // Example patterns:
+//     // "Temperature in New York: 22°C, Clear sky"
+//     // "The current temperature in New York is 22°C with clear skies"
+//     // "New York temperature: 22°C, Clear"
+//     const tempRegex = /(?:temperature in |temperature: |temperature is )?(.*?)(?:[:is ]+)(\d+\.\d+°[CF])(?:[ ,]+(?:with )?(.*))/i;
+//     const match = answer.match(tempRegex);
+
+//     if (match) {
+//       return {
+//         place: match[1].trim(), // e.g., "New York"
+//         temperature: match[2].trim(), // e.g., "22°C"
+//         sky: match[3] ? match[3].trim() : "Not available", // e.g., "Clear sky" or fallback
+//       };
+//     }
+
+//     // Fallback: Check for keywords and degree symbol
+//     if (
+//       answer.toLowerCase().includes("temperature") &&
+//       answer.includes("°") &&
+//       answer.toLowerCase().includes("in")
+//     ) {
+//       // Extract place (between "in" and the temperature value)
+//       const placeMatch = answer.match(/in (.*?)(?=\d+\.\d+°)/i);
+//       const tempMatch = answer.match(/(\d+\.\d+°[CF])/);
+//       const skyMatch = answer.match(/\d+\.\d+°[CF][ ,]+(.*)/);
+
+//       return {
+//         place: placeMatch ? placeMatch[1].trim() : "Unknown",
+//         temperature: tempMatch ? tempMatch[1].trim() : "Unknown",
+//         sky: skyMatch ? skyMatch[1].trim() : "Not available",
+//       };
+//     }
+
+//     return null;
 //   };
 
 //   return (
@@ -168,13 +263,6 @@
 //         </TouchableOpacity>
 //       </View>
 
-//       {/* Welcome Message */}
-//       {showWelcome && (
-//         <Text style={[styles.welcomeMessage, theme === "dark" && styles.darkText]}>
-//           Welcome {firstName} to HUBA AI
-//         </Text>
-//       )}
-
 //       {/* Chat Content */}
 //       <RNScrollView
 //         ref={scrollViewRef}
@@ -184,50 +272,54 @@
 //         {displayedMessages.map((msg, index) => {
 //           const codeBlockRegex = /```([\s\S]*?)```/g;
 //           const codeBlocks = msg.answer?.match(codeBlockRegex) || [];
-//           // Remove code blocks from the text and split into text parts
 //           const textParts = msg.answer
-//             ? msg.answer.split(codeBlockRegex).filter((part, i) => i % 2 === 0) // Keep only the non-code parts
+//             ? msg.answer.split(codeBlockRegex).filter((part, i) => i % 2 === 0)
 //             : [];
 
-//           // Create an array of parts to render (text and code interleaved)
+//           // Check if the response is a temperature response
+//           const tempData = msg.answer ? parseTemperatureResponse(msg.answer) : null;
+
+//           // Create parts array for rendering
 //           const parts = [];
 //           let codeIndex = 0;
 //           let textIndex = 0;
 
-//           // Interleave text and code parts
-//           let currentPos = 0;
-//           while (currentPos < msg.answer?.length) {
-//             const nextCodeBlockMatch = codeBlockRegex.exec(msg.answer);
-//             if (nextCodeBlockMatch) {
-//               const codeStart = nextCodeBlockMatch.index;
-//               const codeEnd = codeBlockRegex.lastIndex;
+//           if (tempData) {
+//             // If it's a temperature response, add it as a special part
+//             parts.push({ type: "temperature", content: tempData });
+//           } else {
+//             // Otherwise, interleave text and code parts
+//             let currentPos = 0;
+//             while (currentPos < msg.answer?.length) {
+//               const nextCodeBlockMatch = codeBlockRegex.exec(msg.answer);
+//               if (nextCodeBlockMatch) {
+//                 const codeStart = nextCodeBlockMatch.index;
+//                 const codeEnd = codeBlockRegex.lastIndex;
 
-//               // Add text before the code block, if any
-//               if (currentPos < codeStart && textIndex < textParts.length) {
-//                 const text = textParts[textIndex].trim();
-//                 if (text) {
-//                   parts.push({ type: "text", content: text });
+//                 if (currentPos < codeStart && textIndex < textParts.length) {
+//                   const text = textParts[textIndex].trim();
+//                   if (text) {
+//                     parts.push({ type: "text", content: text });
+//                   }
+//                   textIndex++;
 //                 }
-//                 textIndex++;
-//               }
 
-//               // Add the code block
-//               if (codeIndex < codeBlocks.length) {
-//                 parts.push({ type: "code", content: codeBlocks[codeIndex] });
-//                 codeIndex++;
-//               }
-
-//               currentPos = codeEnd;
-//             } else {
-//               // Add remaining text after the last code block
-//               if (textIndex < textParts.length) {
-//                 const text = textParts[textIndex].trim();
-//                 if (text) {
-//                   parts.push({ type: "text", content: text });
+//                 if (codeIndex < codeBlocks.length) {
+//                   parts.push({ type: "code", content: codeBlocks[codeIndex] });
+//                   codeIndex++;
 //                 }
-//                 textIndex++;
+
+//                 currentPos = codeEnd;
+//               } else {
+//                 if (textIndex < textParts.length) {
+//                   const text = textParts[textIndex].trim();
+//                   if (text) {
+//                     parts.push({ type: "text", content: text });
+//                   }
+//                   textIndex++;
+//                 }
+//                 break;
 //               }
-//               break;
 //             }
 //           }
 
@@ -264,14 +356,12 @@
 //                 >
 //                   {parts.map((part, partIndex) => {
 //                     if (part.type === "text" && part.content) {
-//                       // Render text with bold styling for <strong> tags
 //                       return (
 //                         <View key={partIndex}>
 //                           {renderTextWithBold(part.content, theme)}
 //                         </View>
 //                       );
 //                     } else if (part.type === "code") {
-//                       // Render code block (preserve HTML tags as plain text)
 //                       const code = part.content.replace(/```/g, "").trim();
 //                       return (
 //                         <View key={partIndex} style={styles.codeWrapper}>
@@ -281,7 +371,7 @@
 //                               theme === "dark" && styles.darkText,
 //                             ]}
 //                           >
-//                             Here is the generated code:
+//                             Here is your code, {firstName}
 //                           </Text>
 //                           <View
 //                             style={[
@@ -312,6 +402,42 @@
 //                           </View>
 //                         </View>
 //                       );
+//                     } else if (part.type === "temperature") {
+//                       const { place, temperature, sky } = part.content;
+//                       return (
+//                         <View
+//                           key={partIndex}
+//                           style={[
+//                             styles.temperatureContainer,
+//                             theme === "dark" && styles.darkTemperatureContainer,
+//                           ]}
+//                         >
+//                           <Text
+//                             style={[
+//                               styles.temperaturePlace,
+//                               theme === "dark" && styles.darkTemperatureText,
+//                             ]}
+//                           >
+//                             {place}
+//                           </Text>
+//                           <Text
+//                             style={[
+//                               styles.temperatureValue,
+//                               theme === "dark" && styles.darkTemperatureText,
+//                             ]}
+//                           >
+//                             {temperature}
+//                           </Text>
+//                           <Text
+//                             style={[
+//                               styles.temperatureText,
+//                               theme === "dark" && styles.darkTemperatureText,
+//                             ]}
+//                           >
+//                             {sky}
+//                           </Text>
+//                         </View>
+//                       );
 //                     }
 //                     return null;
 //                   })}
@@ -322,14 +448,25 @@
 //         })}
 //       </RNScrollView>
 
+//       {/* Welcome Message */}
+//       {showWelcome && (
+//         <View style={styles.welcomeContainer}>
+//           <Text style={[styles.welcomeMessage, theme === "dark" && styles.darkText]}>
+//             Welcome {firstName}
+//           </Text>
+//         </View>
+//       )}
+
 //       {/* Input Bar */}
 //       <View style={[styles.chatInputBar, theme === "dark" && styles.darkInputBar]}>
 //         <TextInput
+//           ref={inputRef}
 //           style={[styles.chatInput, theme === "dark" && styles.darkInput]}
 //           placeholder="Ask anything..."
 //           value={query}
 //           onChangeText={setQuery}
 //           multiline
+//           editable={true} // Explicitly ensure the TextInput is editable
 //         />
 //         <TouchableOpacity onPress={handleSubmit} disabled={isThinking}>
 //           <MaterialIcons
@@ -366,6 +503,17 @@
 //     fontSize: 20,
 //     fontWeight: "600",
 //     color: "#ffffff",
+//   },
+//   welcomeContainer: {
+//     position: "absolute",
+//     top: 0,
+//     left: 0,
+//     right: 0,
+//     bottom: 0,
+//     justifyContent: "center",
+//     alignItems: "center",
+//     zIndex: 1,
+//     pointerEvents: "none", 
 //   },
 //   welcomeMessage: {
 //     textAlign: "center",
@@ -405,7 +553,7 @@
 //     marginBottom: 10,
 //   },
 //   darkResponseContainer: {
-//     backgroundColor: "#374151", // Ensure dark background for response container
+//     backgroundColor: "#374151",
 //   },
 //   aiMessage: {
 //     color: "#111827",
@@ -413,7 +561,7 @@
 //     lineHeight: 20,
 //   },
 //   darkAiMessage: {
-//     color: "#f3f4f6", // Ensure text is visible in dark mode
+//     color: "#f3f4f6",
 //   },
 //   thinking: {
 //     fontStyle: "italic",
@@ -431,6 +579,7 @@
 //     backgroundColor: "#f9fafb",
 //     borderTopWidth: 1,
 //     borderTopColor: "#e5e7eb",
+//     zIndex: 2, // Ensure the input bar is above the welcome message
 //   },
 //   darkInputBar: {
 //     backgroundColor: "#374151",
@@ -488,10 +637,48 @@
 //     right: 5,
 //     padding: 5,
 //   },
+//   // Styles for the temperature container
+//   temperatureContainer: {
+//     alignSelf: "center",
+//     backgroundColor: "#e0f7fa", // Light cyan background for light mode
+//     padding: 15,
+//     borderRadius: 10,
+//     width: 200, // Square shape
+//     height: 200, // Square shape
+//     justifyContent: "center",
+//     alignItems: "center",
+//     marginVertical: 10,
+//     borderWidth: 1, // Add a border to make it more visible
+//     borderColor: "#0288d1",
+//   },
+//   darkTemperatureContainer: {
+//     backgroundColor: "#4b636e", // Darker cyan for dark mode
+//     borderColor: "#81d4fa",
+//   },
+//   temperaturePlace: {
+//     fontSize: 18,
+//     fontWeight: "600",
+//     color: "#111827",
+//     textAlign: "center",
+//     marginBottom: 10,
+//   },
+//   temperatureText: {
+//     fontSize: 16,
+//     color: "#111827",
+//     textAlign: "center",
+//     marginTop: 10,
+//   },
+//   darkTemperatureText: {
+//     color: "#f3f4f6",
+//   },
+//   temperatureValue: {
+//     fontSize: 24,
+//     fontWeight: "bold",
+//     color: "#111827",
+//     textAlign: "center",
+//   },
 // });
 
-
-//////////////////////////////////////////////////////////////
 
 import React, { useState, useEffect, useRef } from "react";
 import {
@@ -519,13 +706,12 @@ export default function ChatScreen() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const scrollViewRef = useRef<RNScrollView | null>(null);
-  const inputRef = useRef<TextInput | null>(null); // Add ref for TextInput
+  const inputRef = useRef<TextInput | null>(null);
 
   useEffect(() => {
     const welcomeTimer = setTimeout(() => {
       setShowWelcome(false);
     }, 3000);
-
     return () => {
       clearTimeout(welcomeTimer);
     };
@@ -562,22 +748,17 @@ export default function ChatScreen() {
       day: "numeric",
     });
     const day = now.toLocaleDateString("en-US", { weekday: "long" });
-
     const lowerQuery = query.toLowerCase();
     if (lowerQuery.includes("time")) {
       return `The current time is ${time}, on ${day}, ${date}.`;
     } else {
-      // For date or day queries
       return `Today is ${date}, a ${day}. The current time is ${time}.`;
     }
   };
 
   const handleSubmit = async () => {
     if (!query.trim()) return;
-
-    // Hide the welcome message immediately when the user submits a question
     setShowWelcome(false);
-
     const timestamp = new Date().toISOString();
     const newMessage = {
       question: query,
@@ -589,7 +770,6 @@ export default function ChatScreen() {
     setDisplayedMessages((prev) => [...prev, newMessage]);
     setIsThinking(true);
 
-    // Check if the query is about time or date
     if (isTimeOrDateQuery(query)) {
       const response = generateTimeDateResponse(query);
       setDisplayedMessages((prev) => {
@@ -607,7 +787,6 @@ export default function ChatScreen() {
       return;
     }
 
-    // For non-time/date queries, proceed with backend request
     try {
       const token = await AsyncStorage.getItem("token");
       const response = await axios.post(
@@ -700,40 +879,30 @@ export default function ChatScreen() {
 
   // Function to check if the response is a temperature response and extract data
   const parseTemperatureResponse = (answer: string) => {
-    // Try a more flexible regex to match various temperature response formats
-    // Example patterns:
-    // "Temperature in New York: 22°C, Clear sky"
-    // "The current temperature in New York is 22°C with clear skies"
-    // "New York temperature: 22°C, Clear"
-    const tempRegex = /(?:temperature in |temperature: |temperature is )?(.*?)(?:[:is ]+)(\d+\.\d+°[CF])(?:[ ,]+(?:with )?(.*))/i;
+    const tempRegex =
+      /(?:temperature in |temperature: |temperature is )?(.*?)(?:[:is ]+)(\d+\.\d+°[CF])(?:[ ,]+(?:with )?(.*))/i;
     const match = answer.match(tempRegex);
-
     if (match) {
       return {
-        place: match[1].trim(), // e.g., "New York"
-        temperature: match[2].trim(), // e.g., "22°C"
-        sky: match[3] ? match[3].trim() : "Not available", // e.g., "Clear sky" or fallback
+        place: match[1].trim(),
+        temperature: match[2].trim(),
+        sky: match[3] ? match[3].trim() : "Not available",
       };
     }
-
-    // Fallback: Check for keywords and degree symbol
     if (
       answer.toLowerCase().includes("temperature") &&
       answer.includes("°") &&
       answer.toLowerCase().includes("in")
     ) {
-      // Extract place (between "in" and the temperature value)
       const placeMatch = answer.match(/in (.*?)(?=\d+\.\d+°)/i);
       const tempMatch = answer.match(/(\d+\.\d+°[CF])/);
       const skyMatch = answer.match(/\d+\.\d+°[CF][ ,]+(.*)/);
-
       return {
         place: placeMatch ? placeMatch[1].trim() : "Unknown",
         temperature: tempMatch ? tempMatch[1].trim() : "Unknown",
         sky: skyMatch ? skyMatch[1].trim() : "Not available",
       };
     }
-
     return null;
   };
 
@@ -774,19 +943,15 @@ export default function ChatScreen() {
           const parts = [];
           let codeIndex = 0;
           let textIndex = 0;
-
           if (tempData) {
-            // If it's a temperature response, add it as a special part
             parts.push({ type: "temperature", content: tempData });
           } else {
-            // Otherwise, interleave text and code parts
             let currentPos = 0;
             while (currentPos < msg.answer?.length) {
               const nextCodeBlockMatch = codeBlockRegex.exec(msg.answer);
               if (nextCodeBlockMatch) {
                 const codeStart = nextCodeBlockMatch.index;
                 const codeEnd = codeBlockRegex.lastIndex;
-
                 if (currentPos < codeStart && textIndex < textParts.length) {
                   const text = textParts[textIndex].trim();
                   if (text) {
@@ -794,12 +959,10 @@ export default function ChatScreen() {
                   }
                   textIndex++;
                 }
-
                 if (codeIndex < codeBlocks.length) {
                   parts.push({ type: "code", content: codeBlocks[codeIndex] });
                   codeIndex++;
                 }
-
                 currentPos = codeEnd;
               } else {
                 if (textIndex < textParts.length) {
@@ -825,6 +988,7 @@ export default function ChatScreen() {
               >
                 {msg.question}
               </Text>
+
               {/* Thinking Feature */}
               {isThinking && index === displayedMessages.length - 1 && (
                 <Text
@@ -837,6 +1001,7 @@ export default function ChatScreen() {
                   Thinking...
                 </Text>
               )}
+
               {/* AI's Response */}
               {msg.answer && (
                 <View
@@ -903,6 +1068,7 @@ export default function ChatScreen() {
                             theme === "dark" && styles.darkTemperatureContainer,
                           ]}
                         >
+                          {/* Place Name */}
                           <Text
                             style={[
                               styles.temperaturePlace,
@@ -911,6 +1077,7 @@ export default function ChatScreen() {
                           >
                             {place}
                           </Text>
+                          {/* Temperature Value */}
                           <Text
                             style={[
                               styles.temperatureValue,
@@ -919,6 +1086,7 @@ export default function ChatScreen() {
                           >
                             {temperature}
                           </Text>
+                          {/* Sky Condition */}
                           <Text
                             style={[
                               styles.temperatureText,
@@ -957,7 +1125,7 @@ export default function ChatScreen() {
           value={query}
           onChangeText={setQuery}
           multiline
-          editable={true} // Explicitly ensure the TextInput is editable
+          editable={true}
         />
         <TouchableOpacity onPress={handleSubmit} disabled={isThinking}>
           <MaterialIcons
@@ -1004,7 +1172,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1,
-    pointerEvents: "none", 
+    pointerEvents: "none",
   },
   welcomeMessage: {
     textAlign: "center",
@@ -1070,7 +1238,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#f9fafb",
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
-    zIndex: 2, // Ensure the input bar is above the welcome message
+    zIndex: 2,
   },
   darkInputBar: {
     backgroundColor: "#374151",
@@ -1131,19 +1299,19 @@ const styles = StyleSheet.create({
   // Styles for the temperature container
   temperatureContainer: {
     alignSelf: "center",
-    backgroundColor: "#e0f7fa", // Light cyan background for light mode
+    backgroundColor: "#e0f7fa",
     padding: 15,
     borderRadius: 10,
-    width: 200, // Square shape
-    height: 200, // Square shape
+    width: 200,
+    height: 200,
     justifyContent: "center",
     alignItems: "center",
     marginVertical: 10,
-    borderWidth: 1, // Add a border to make it more visible
+    borderWidth: 1,
     borderColor: "#0288d1",
   },
   darkTemperatureContainer: {
-    backgroundColor: "#4b636e", // Darker cyan for dark mode
+    backgroundColor: "#4b636e",
     borderColor: "#81d4fa",
   },
   temperaturePlace: {
@@ -1153,19 +1321,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 10,
   },
-  temperatureText: {
-    fontSize: 16,
-    color: "#111827",
-    textAlign: "center",
-    marginTop: 10,
-  },
-  darkTemperatureText: {
-    color: "#f3f4f6",
-  },
   temperatureValue: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#111827",
     textAlign: "center",
+    marginBottom: 10,
+  },
+  temperatureText: {
+    fontSize: 16,
+    color: "#111827",
+    textAlign: "center",
+  },
+  darkTemperatureText: {
+    color: "#f3f4f6",
   },
 });
